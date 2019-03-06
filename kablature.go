@@ -7,29 +7,42 @@ import (
 )
 
 const (
-	TAB_WIDTH        = TABNOTE_WIDTH * NUM_TABNOTES
-	TABNOTE_WIDTH    = 15
+	TAB_WIDTH    = TABNOTE_WIDTH * NUM_TABNOTES
+	TAB_MARGIN_X = 50
+	TAB_MARGIN_Y = 10
+
 	NUM_TABNOTES     = 15
-	TABNOTE_COLOR    = "rgb(255,255,255)"
-	TABNOTE_MARKED   = "rgb(238,124,128)"
-	TAB_MARGIN_X     = 100
-	NOTE_DIAMETER    = 8
-	TAB_MARGIN_Y     = 10
 	TABNOTE_OFFSET_Y = 3
+	TABNOTE_WIDTH    = 15
+	TABNOTE_COLOR    = "white"
+	TABNOTE_MARKED   = "#ee7c80"
 
 	MEASURE_THICKNESS = 3
-	NOTE_FONTSIZE     = 10
+	FONTSIZE          = 10
 
-	NOTES      = "BGECAFDCEGBDFAC"
-	NUM_NOTES  = len(NOTES)
-	HALF_NOTES = NUM_NOTES / 2
+	NOTE_DIAMETER = 8
+	NOTES         = "BGECAFDCEGBDFAC"
+	NUM_NOTES     = len(NOTES)
+	HALF_NOTES    = NUM_NOTES / 2
+)
+
+const (
+	WHOLE_NOTE = iota
+	HALF_NOTE
+	QUARTER_NOTE
+	EIGHTH_NOTE
+
+	WHOLE_REST
+	HALF_REST
+	QUARTER_REST
+	EIGHTH_REST
 )
 
 func drawTabNote(canvas *svg.SVG, tab_height, note, offset_y int, marked bool) {
 	x := TAB_MARGIN_X + note*TABNOTE_WIDTH
 	rect_height := tab_height + offset_y*TABNOTE_OFFSET_Y
 
-	line_style := "stroke-width:1;stroke:rgb(0,0,0)"
+	line_style := "stroke-width:1;stroke:black"
 
 	if marked {
 		line_style += ";fill:" + TABNOTE_MARKED
@@ -39,8 +52,8 @@ func drawTabNote(canvas *svg.SVG, tab_height, note, offset_y int, marked bool) {
 
 	canvas.Rect(x, TAB_MARGIN_Y, TABNOTE_WIDTH, rect_height, line_style)
 
-	text_style := "text-anchor:middle;font-size:" + strconv.Itoa(NOTE_FONTSIZE) + ";fill:black"
-	canvas.Text(x+TABNOTE_WIDTH/2, TAB_MARGIN_Y+rect_height+NOTE_FONTSIZE,
+	text_style := "text-anchor:middle;font-size:" + strconv.Itoa(FONTSIZE) + ";fill:black"
+	canvas.Text(x+TABNOTE_WIDTH/2, TAB_MARGIN_Y+rect_height+FONTSIZE,
 		string(NOTES[note]), text_style)
 }
 
@@ -48,13 +61,13 @@ func makeTemplate(w io.Writer) *svg.SVG {
 	tab_height := 500
 
 	width := TAB_WIDTH + TAB_MARGIN_X*2
-	height := tab_height + TAB_MARGIN_Y*2 + HALF_NOTES*TABNOTE_OFFSET_Y + NOTE_FONTSIZE
+	height := tab_height + TAB_MARGIN_Y*2 + HALF_NOTES*TABNOTE_OFFSET_Y + FONTSIZE
 
 	canvas := svg.New(w)
 	canvas.Start(width, height)
 
 	// Frame a rectangle around the canvas to show border
-	canvas.Rect(0, 0, width, height, "fill:none;stroke-width:1;stroke:rgb(0,255,0)")
+	canvas.Rect(0, 0, width, height, "fill:none;stroke-width:1;stroke:green")
 
 	for i := 0; i < NUM_NOTES; i++ {
 		if i < HALF_NOTES {
@@ -69,7 +82,7 @@ func makeTemplate(w io.Writer) *svg.SVG {
 	center_x := TAB_MARGIN_X + HALF_NOTES*TABNOTE_WIDTH + MEASURE_THICKNESS/2
 	line_height := tab_height + HALF_NOTES*TABNOTE_OFFSET_Y
 	canvas.Line(center_x, TAB_MARGIN_Y, center_x, TAB_MARGIN_Y+line_height,
-		"stroke-width:"+strconv.Itoa(MEASURE_THICKNESS)+";stroke:rgb(0,0,0)")
+		"stroke-width:"+strconv.Itoa(MEASURE_THICKNESS)+";stroke:black")
 
 	// canvas.Circle(width/2, height/2, 100)
 
