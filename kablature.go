@@ -10,6 +10,7 @@ const (
 	TAB_WIDTH    = TABNOTE_WIDTH * NUM_TABNOTES
 	TAB_MARGIN_X = 50
 	TAB_MARGIN_Y = 10
+	TAB_NOTES    = "BGECAFDCEGBDFAC"
 
 	NUM_TABNOTES     = 15
 	TABNOTE_OFFSET_Y = 3
@@ -21,8 +22,7 @@ const (
 	FONTSIZE          = 10
 
 	NOTE_DIAMETER = 8
-	NOTES         = "BGECAFDCEGBDFAC"
-	NUM_NOTES     = len(NOTES)
+	NUM_NOTES     = len(TAB_NOTES)
 	HALF_NOTES    = NUM_NOTES / 2
 )
 
@@ -54,7 +54,7 @@ func drawTabNote(canvas *svg.SVG, tab_height, note, offset_y int, marked bool) {
 
 	text_style := "text-anchor:middle;font-size:" + strconv.Itoa(FONTSIZE) + ";fill:black"
 	canvas.Text(x+TABNOTE_WIDTH/2, TAB_MARGIN_Y+rect_height+FONTSIZE,
-		string(NOTES[note]), text_style)
+		string(TAB_NOTES[note]), text_style)
 }
 
 func makeTemplate(w io.Writer) *svg.SVG {
