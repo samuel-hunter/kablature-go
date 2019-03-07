@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/ajstarks/svgo"
 	"io"
 	"math"
@@ -26,11 +27,13 @@ const (
 	NOTE_RADIUS   = 4
 	SYMBOL_HEIGHT = TABNOTE_WIDTH // Spacing a general musical symbol would have allocated.
 
+	BEATS_PER_MEASURE = 8
+	MEASURES_PER_TAB  = 8
+
 	// Calculated constants
-	MEASURES_PER_TAB = 7
-	MAX_TAB_HEIGHT   = (9*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
-	NUM_NOTES        = len(TAB_NOTES)
-	HALF_NOTES       = NUM_NOTES / 2
+	MAX_TAB_HEIGHT = (9*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
+	NUM_NOTES      = len(TAB_NOTES)
+	HALF_NOTES     = NUM_NOTES / 2
 )
 
 var (
@@ -40,12 +43,15 @@ var (
 )
 
 type TabScore struct {
-	canvas      *svg.SVG
-	cur_tab     int
-	max_tabs    int
-	tab_started bool
-	current_y   int
-	measure     int
+	canvas         *svg.SVG
+	cur_tab        int
+	total_measures int
+
+	tab_measures_left int
+	tab_started       bool
+	measure_beats     int
+	current_y         int
+	measure           int
 }
 
 func NewScore(w io.Writer, total_measures int) *TabScore {
@@ -60,7 +66,10 @@ func NewScore(w io.Writer, total_measures int) *TabScore {
 	// Fill canvas with white background
 	canvas.Rect(0, 0, width, height, "fill:white")
 
-	return &TabScore{canvas: canvas, max_tabs: tablatures}
+	score := &TabScore{canvas: canvas, total_measures: total_measures}
+	score.AddMeasure()
+
+	return score
 }
 
 func (tab *TabScore) Close() {
@@ -89,15 +98,23 @@ func (score *TabScore) drawTabNote(tab_height, note, offset_y int, marked bool) 
 		string(TAB_NOTES[note]), text_style)
 }
 
-func (score *TabScore) NewTablature(measures int) {
+func (score *TabScore) NewTablature() {
 	if score.tab_started {
 		score.canvas.Gend()
 	}
 
+	last_measure := false
+
+	score.tab_measures_left = score.total_measures - MEASURES_PER_TAB*score.cur_tab
+	if score.tab_measures_left >= MEASURES_PER_TAB {
+		score.tab_measures_left = MEASURES_PER_TAB
+		last_measure = true
+	}
+
 	score.cur_tab++
 
-	tab_height := measures * 9 * SYMBOL_HEIGHT
-	if score.cur_tab == score.max_tabs {
+	tab_height := score.tab_measures_left * 9 * SYMBOL_HEIGHT
+	if last_measure {
 		tab_height += SYMBOL_HEIGHT
 	}
 
@@ -144,17 +161,39 @@ func findMeasures(symbols []Symbol) int {
 	return int(math.Ceil(float64(eighth_beats) / 8))
 }
 
-func (tab *TabScore) DrawMeasureBar() {
-	bar_y := tab.current_y - MEASURE_THICKNESS/2
+func (score *TabScore) AddMeasure() {
+	if score.tab_measures_left == 0 {
+		score.NewTablature()
+	}
+
+	bar_y := score.current_y - MEASURE_THICKNESS/2
 	text_style := TEXT_STYLE + ";dominant-baseline:central"
 	text_margin_left := 2
-	tab.measure++
+	score.measure++
 
-	tab.canvas.Line(0, bar_y, TAB_WIDTH, bar_y, MEASURE_STYLE)
-	tab.canvas.Text(TAB_WIDTH+text_margin_left, bar_y,
-		strconv.Itoa(tab.measure), text_style)
+	score.canvas.Line(0, bar_y, TAB_WIDTH, bar_y, MEASURE_STYLE)
+	score.canvas.Text(TAB_WIDTH+text_margin_left, bar_y,
+		strconv.Itoa(score.measure), text_style)
 
-	tab.current_y -= SYMBOL_HEIGHT
+	score.tab_measures_left--
+	score.current_y -= SYMBOL_HEIGHT
+}
+
+func (score *TabScore) MoveForward(sym Symbol) error {
+	length := findTrueLength(sym)
+	score.current_y -= length * SYMBOL_HEIGHT
+
+	score.measure_beats += length
+	if score.measure_beats > 8 {
+		return errors.New(fmt.Sprintf(
+			"Expected %d beats in measure, received %d",
+			BEATS_PER_MEASURE, score.measure_beats))
+	} else if score.measure_beats == 8 {
+		score.AddMeasure()
+		score.measure_beats = 0
+	}
+
+	return nil
 }
 
 // Return the x position that the provided pitch would be on.
@@ -211,23 +250,22 @@ func (tab *TabScore) DrawStem(note_x int, length byte) {
 }
 
 // Draw a note with a stem and taper when appropriate.
-func (tab *TabScore) DrawNote(note Note) error {
-	note_x, err := tab.DrawPitch(note)
+func (score *TabScore) AddNote(note Note) error {
+	note_x, err := score.DrawPitch(note)
 	if err != nil {
 		return err
 	}
 
-	tab.DrawStem(note_x, note.length)
-
-	tab.current_y -= SYMBOL_HEIGHT * findTrueLength(note)
+	score.DrawStem(note_x, note.length)
+	score.MoveForward(note)
 	return nil
 }
 
-func (tab *TabScore) DrawChord(chord Chord) error {
+func (score *TabScore) AddChord(chord Chord) error {
 	rightmost_x := 0
 
 	for _, pitch := range chord.pitches {
-		note_x, err := tab.DrawPitch(Note{
+		note_x, err := score.DrawPitch(Note{
 			length: chord.length,
 			dotted: chord.dotted,
 			pitch:  pitch,
@@ -241,65 +279,30 @@ func (tab *TabScore) DrawChord(chord Chord) error {
 		}
 	}
 
-	tab.DrawStem(rightmost_x, chord.length)
-
-	tab.current_y -= SYMBOL_HEIGHT * findTrueLength(chord)
+	score.DrawStem(rightmost_x, chord.length)
+	score.MoveForward(chord)
 	return nil
 }
 
 func DrawScore(w io.Writer, symbols []Symbol) error {
-	measures_left := findMeasures(symbols)
-	score := NewScore(w, measures_left)
-	score.NewTablature(MEASURES_PER_TAB)
+	score := NewScore(w, findMeasures(symbols))
 	defer score.Close()
 
-	eighth_beats := 0
-	measures_done := -1
 	for _, symb := range symbols {
-		// Add a measure bar when necessary.
-		if eighth_beats%8 == 0 {
-			measures_done++
-
-			if measures_done == MEASURES_PER_TAB {
-				measures_left -= measures_done
-				measures_done = 0
-
-				if measures_left < MEASURES_PER_TAB {
-					score.NewTablature(measures_left)
-				} else {
-					score.NewTablature(MEASURES_PER_TAB)
-				}
-			}
-
-			score.DrawMeasureBar()
-			eighth_beats = 0
-		}
-
-		// Add empty space for a note.
 		switch symb.(type) {
 		case Note:
-			err := score.DrawNote(symb.(Note))
+			err := score.AddNote(symb.(Note))
 			if err != nil {
 				return err
 			}
 		case Chord:
-			err := score.DrawChord(symb.(Chord))
+			err := score.AddChord(symb.(Chord))
 			if err != nil {
 				return err
 			}
 		default:
 			score.canvas.Circle(TAB_WIDTH/2, score.current_y, NOTE_RADIUS, "fill:green")
-			score.current_y -= int(symb.Length()) * SYMBOL_HEIGHT
-		}
-
-		eighth_beats += int(symb.Length())
-		if symb.Dotted() {
-			eighth_beats += int(symb.Length()) / 2
-		}
-
-		if eighth_beats > 8 {
-			return errors.New("Uneven beats in measure (expected 8 eighth beats, received " +
-				strconv.Itoa(eighth_beats) + ").")
+			score.MoveForward(symb)
 		}
 	}
 
