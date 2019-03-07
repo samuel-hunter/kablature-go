@@ -1,11 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"strings"
+	"os"
 )
 
 func InterpretTablature(w io.Writer, r io.Reader) error {
@@ -23,21 +22,17 @@ func InterpretTablature(w io.Writer, r io.Reader) error {
 		symbols = append(symbols, symbol)
 	}
 
-	fmt.Println(symbols)
-
 	return DrawTablature(w, symbols)
 }
 
 func writeToServer(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
+	file, err := os.Open("song1.tab")
+	if err != nil {
+		panic(err)
+	}
 
-	err := InterpretTablature(w, strings.NewReader("4 e 1 c 2 (c e g)"))
-	// err := DrawTablature(w, []Symbol{
-	// 	Note{length: 4, dotted: false, pitch: 2},
-	// 	Note{length: 1, dotted: false, pitch: 0},
-	// 	Chord{length: 2, dotted: false, pitches: []byte{0, 2, 4}},
-	// })
-
+	err = InterpretTablature(w, file)
 	if err != nil {
 		panic(err)
 	}

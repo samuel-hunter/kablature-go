@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"github.com/ajstarks/svgo"
 	"io"
 	"math"
@@ -72,8 +71,8 @@ func NewTablature(w io.Writer, tab_height int) *Tablature {
 	canvas := svg.New(w)
 	canvas.Start(width, height)
 
-	// Frame a rectangle around the canvas to show border
-	canvas.Rect(0, 0, width, height, "fill:none;stroke-width:1;stroke:green")
+	// Fill canvas with white background
+	canvas.Rect(0, 0, width, height, "fill:white")
 
 	for i := 0; i < NUM_NOTES; i++ {
 		if i < HALF_NOTES {
@@ -108,8 +107,8 @@ func findTabHeight(symbols []Symbol) int {
 		measure_bars--
 	}
 
-	// +1 for measure end
-	return (eighth_beats + measure_bars + 1) * SYMBOL_HEIGHT
+	// +2 for measure end
+	return (eighth_beats + measure_bars + 2) * SYMBOL_HEIGHT
 }
 
 func (tab *Tablature) DrawMeasureBar() {
@@ -222,7 +221,6 @@ func DrawTablature(w io.Writer, symbols []Symbol) error {
 	eighth_beats := 0
 
 	for _, symb := range symbols {
-		fmt.Println(symb)
 		// Add a measure bar when necessary.
 		if eighth_beats%8 == 0 {
 			tablature.DrawMeasureBar()

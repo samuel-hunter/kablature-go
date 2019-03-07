@@ -226,6 +226,8 @@ func (parser *Parser) takeLength() error {
 	if err != io.EOF && tok.typ == TOK_DOT {
 		parser.nextToken() // Consume token
 		parser.dotted = true
+	} else {
+		parser.dotted = false
 	}
 
 	return nil
