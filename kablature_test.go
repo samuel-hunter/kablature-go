@@ -53,20 +53,20 @@ func TestLexer(t *testing.T) {
 		Token{typ: TOK_NOTE, content: "b"},
 		Token{typ: TOK_PAREN_CLOSE, content: ")"},
 	})
-	reportLex("1/2 e' c  2e", []Token{
-		Token{typ: TOK_DURATION, content: "1/2"},
+	reportLex("8 e' c  2e", []Token{
+		Token{typ: TOK_DURATION, content: "8"},
 		Token{typ: TOK_NOTE, content: "e'"},
 		Token{typ: TOK_NOTE, content: "c"},
 		Token{typ: TOK_DURATION, content: "2"},
 		Token{typ: TOK_NOTE, content: "e"},
 	})
-	reportLex("e g > e g < c", []Token{
+	reportLex("e g > c e < e", []Token{
 		Token{typ: TOK_NOTE, content: "e"},
 		Token{typ: TOK_NOTE, content: "g"},
 		Token{typ: TOK_OCTAVE_UPSHIFT, content: ">"},
-		Token{typ: TOK_NOTE, content: "e"},
-		Token{typ: TOK_NOTE, content: "g"},
-		Token{typ: TOK_OCTAVE_DOWNSHIFT, content: "<"},
 		Token{typ: TOK_NOTE, content: "c"},
+		Token{typ: TOK_NOTE, content: "e"},
+		Token{typ: TOK_OCTAVE_DOWNSHIFT, content: "<"},
+		Token{typ: TOK_NOTE, content: "e"},
 	})
 }

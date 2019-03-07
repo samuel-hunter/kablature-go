@@ -7,7 +7,14 @@ import (
 
 func hello(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
-	Hello(w)
+
+	DrawTablature(w, []Symbol{
+		Note{length: 1, dotted: false, pitch: 0},
+		Note{length: 1, dotted: false, pitch: 1},
+		Note{length: 2, dotted: false, pitch: 2},
+		Note{length: 4, dotted: false, pitch: 3},
+		Note{length: 8, dotted: false, pitch: 4},
+	})
 }
 
 func main() {
