@@ -10,12 +10,11 @@ import (
 )
 
 const (
-	TAB_WIDTH    = TABNOTE_WIDTH * NUM_TABNOTES
+	TAB_WIDTH    = TABNOTE_WIDTH * NUM_NOTES
 	TAB_MARGIN_X = 50
 	TAB_MARGIN_Y = 10
-	TAB_NOTES    = "BGECAFDCEGBDFAC"
+	TAB_NOTES    = "DBGECAFDCEGBDFACE"
 
-	NUM_TABNOTES     = 15
 	TABNOTE_OFFSET_Y = 5
 	TABNOTE_WIDTH    = 15
 	TABNOTE_COLOR    = "white"
@@ -111,10 +110,10 @@ func (score *TabScore) NewTablature(measures int) {
 	for i := 0; i < NUM_NOTES; i++ {
 		if i < HALF_NOTES {
 			// Draw notes going down
-			score.drawTabNote(tab_height, i, i, (i+2)%3 == 0)
+			score.drawTabNote(tab_height, i, i, (i+1)%3 == 0)
 		} else {
 			// Draw notes going up
-			score.drawTabNote(tab_height, i, NUM_NOTES-i-1, (i+2)%3 == 0)
+			score.drawTabNote(tab_height, i, NUM_NOTES-i-1, (i+1)%3 == 0)
 		}
 	}
 
@@ -160,13 +159,13 @@ func (tab *TabScore) DrawMeasureBar() {
 
 // Return the x position that the provided pitch would be on.
 func findNotePosition(pitch byte) (int, error) {
-	notes := []byte{15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14}
+	notes := []byte{15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14, 16}
 	index := bytes.IndexByte(notes, pitch)
 	if index < 0 {
 		return -1, errors.New("Pitch out of range.")
 	}
 
-	return int(math.Ceil((float64(index) - 0.5) * TABNOTE_WIDTH)), nil
+	return int(math.Ceil((float64(index) + 0.5) * TABNOTE_WIDTH)), nil
 }
 
 // Draw a note without any stem or taper and return its x position.
