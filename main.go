@@ -8,8 +8,8 @@ import (
 )
 
 func InterpretTablature(w io.Writer, r io.Reader) error {
-	parser := NewParser(NewScanner(r))
-	symbols := []Symbol{}
+	parser := NewParser(r)
+	var symbols []Symbol
 
 	for {
 		symbol, err := parser.Next()
@@ -22,7 +22,7 @@ func InterpretTablature(w io.Writer, r io.Reader) error {
 		symbols = append(symbols, symbol)
 	}
 
-	return DrawTablature(w, symbols)
+	return DrawScore(w, symbols)
 }
 
 func writeToServer(w http.ResponseWriter, req *http.Request) {
