@@ -8,13 +8,16 @@ import (
 func hello(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 
-	DrawTablature(w, []Symbol{
-		Note{length: 1, dotted: false, pitch: 0},
-		Note{length: 1, dotted: false, pitch: 1},
-		Note{length: 2, dotted: false, pitch: 2},
+	err := DrawTablature(w, []Symbol{
 		Note{length: 4, dotted: false, pitch: 3},
-		Note{length: 8, dotted: false, pitch: 4},
+		Note{length: 1, dotted: false, pitch: 1},
+		Chord{length: 2, dotted: true, pitches: []byte{
+			0, 2, 4,
+		}},
 	})
+	if err != nil {
+		panic(err)
+	}
 }
 
 func main() {

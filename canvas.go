@@ -107,7 +107,8 @@ func findTabHeight(symbols []Symbol) int {
 		measure_bars--
 	}
 
-	return (eighth_beats + measure_bars) * SYMBOL_HEIGHT
+	// +1 for measure end
+	return (eighth_beats + measure_bars + 1) * SYMBOL_HEIGHT
 }
 
 func (tab *Tablature) DrawMeasureBar() {
@@ -123,6 +124,7 @@ func (tab *Tablature) DrawMeasureBar() {
 	tab.current_y -= SYMBOL_HEIGHT
 }
 
+// Return the x position that the provided pitch would be on.
 func findNotePosition(pitch byte) (int, error) {
 	notes := []byte{15, 13, 11, 9, 7, 5, 3, 1, 0, 2, 4, 6, 8, 10, 12, 14}
 	index := bytes.IndexByte(notes, pitch)
@@ -133,35 +135,39 @@ func findNotePosition(pitch byte) (int, error) {
 	return TAB_LEFT + int(math.Ceil((float64(index)-0.5)*TABNOTE_WIDTH)), nil
 }
 
-func (tab *Tablature) DrawNote(note Note) error {
+// Draw a note without any stem or taper and return its x position.
+func (tab *Tablature) DrawPitch(note Note) (int, error) {
 	note_x, err := findNotePosition(note.pitch)
-	filled := true
-	with_line := true
-	tapered := false
 
 	if err != nil {
-		return err
+		return -1, err
 	}
 
-	switch note.length {
-	case EIGHTH_NOTE:
-		tapered = true
-	case HALF_NOTE:
-		filled = false
-	case WHOLE_NOTE:
-		filled = false
-		with_line = false
-	}
+	filled := note.length == HALF_NOTE || note.length == WHOLE_NOTE
 
 	circle_style := THIN_STYLE
 	if filled {
-		circle_style += ";fill:black"
-	} else {
 		circle_style += ";fill:white"
+	} else {
+		circle_style += ";fill:black"
 	}
 
 	tab.canvas.Circle(note_x, tab.current_y, NOTE_RADIUS, circle_style)
-	if with_line {
+
+	// Add dotted circle if required
+	if note.dotted {
+		tab.canvas.Circle(note_x+NOTE_RADIUS+2, tab.current_y-NOTE_RADIUS-3,
+			2)
+	}
+	return note_x, nil
+}
+
+// Draw a note's stem and taper if appropriate.
+func (tab *Tablature) DrawStem(note_x int, length int) {
+	with_stem := length != WHOLE_NOTE
+	tapered := length == EIGHTH_NOTE
+
+	if with_stem {
 		line_y := tab.current_y - NOTE_RADIUS
 		tab.canvas.Line(TAB_LEFT-20, line_y, note_x, line_y, THIN_STYLE)
 
@@ -169,8 +175,42 @@ func (tab *Tablature) DrawNote(note Note) error {
 			tab.canvas.Line(TAB_LEFT-20, line_y, TAB_LEFT-15, line_y-5, THIN_STYLE)
 		}
 	}
+}
 
-	tab.current_y -= SYMBOL_HEIGHT * note.Length()
+// Draw a note with a stem and taper when appropriate.
+func (tab *Tablature) DrawNote(note Note) error {
+	note_x, err := tab.DrawPitch(note)
+	if err != nil {
+		return err
+	}
+
+	tab.DrawStem(note_x, note.length)
+
+	tab.current_y -= SYMBOL_HEIGHT * note.length
+	return nil
+}
+
+func (tab *Tablature) DrawChord(chord Chord) error {
+	rightmost_x := 0
+
+	for _, pitch := range chord.pitches {
+		note_x, err := tab.DrawPitch(Note{
+			length: chord.length,
+			dotted: chord.dotted,
+			pitch:  pitch,
+		})
+		if err != nil {
+			return err
+		}
+
+		if rightmost_x < note_x {
+			rightmost_x = note_x
+		}
+	}
+
+	tab.DrawStem(rightmost_x, chord.length)
+
+	tab.current_y -= SYMBOL_HEIGHT * chord.length
 	return nil
 }
 
@@ -179,13 +219,12 @@ func DrawTablature(w io.Writer, symbols []Symbol) error {
 	defer tablature.canvas.End()
 
 	eighth_beats := 0
-	current_measure := 0
 
 	for _, symb := range symbols {
 		// Add a measure bar when necessary.
 		if eighth_beats%8 == 0 {
-			current_measure++
 			tablature.DrawMeasureBar()
+			eighth_beats = 0
 		}
 
 		// Add empty space for a note.
@@ -195,12 +234,25 @@ func DrawTablature(w io.Writer, symbols []Symbol) error {
 			if err != nil {
 				return err
 			}
+		case Chord:
+			err := tablature.DrawChord(symb.(Chord))
+			if err != nil {
+				return err
+			}
 		default:
 			tablature.canvas.Circle(TAB_LEFT+TAB_WIDTH/2, tablature.current_y, NOTE_RADIUS, "")
 			tablature.current_y -= symb.Length() * SYMBOL_HEIGHT
 		}
 
 		eighth_beats += symb.Length()
+		if symb.Dotted() {
+			eighth_beats += symb.Length() / 2
+		}
+
+		if eighth_beats > 8 {
+			return errors.New("Uneven beats in measure (expected 8 eighth beats, received " +
+				strconv.Itoa(eighth_beats) + ").")
+		}
 	}
 
 	// Add ending lines

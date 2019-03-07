@@ -19,9 +19,9 @@ type Note struct {
 }
 
 type Chord struct {
-	length int
-	dotted bool
-	pitch  []byte
+	length  int
+	dotted  bool
+	pitches []byte
 }
 
 type Rest struct {
