@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/ajstarks/svgo"
 	"io"
 	"math"
@@ -99,7 +100,7 @@ func findTabHeight(symbols []Symbol) int {
 	eighth_beats := 0
 
 	for _, symb := range symbols {
-		eighth_beats += symb.Length()
+		eighth_beats += int(symb.Length())
 	}
 
 	measure_bars := eighth_beats / 8
@@ -163,7 +164,7 @@ func (tab *Tablature) DrawPitch(note Note) (int, error) {
 }
 
 // Draw a note's stem and taper if appropriate.
-func (tab *Tablature) DrawStem(note_x int, length int) {
+func (tab *Tablature) DrawStem(note_x int, length byte) {
 	with_stem := length != WHOLE_NOTE
 	tapered := length == EIGHTH_NOTE
 
@@ -186,7 +187,7 @@ func (tab *Tablature) DrawNote(note Note) error {
 
 	tab.DrawStem(note_x, note.length)
 
-	tab.current_y -= SYMBOL_HEIGHT * note.length
+	tab.current_y -= SYMBOL_HEIGHT * int(note.length)
 	return nil
 }
 
@@ -210,7 +211,7 @@ func (tab *Tablature) DrawChord(chord Chord) error {
 
 	tab.DrawStem(rightmost_x, chord.length)
 
-	tab.current_y -= SYMBOL_HEIGHT * chord.length
+	tab.current_y -= SYMBOL_HEIGHT * int(chord.length)
 	return nil
 }
 
@@ -221,6 +222,7 @@ func DrawTablature(w io.Writer, symbols []Symbol) error {
 	eighth_beats := 0
 
 	for _, symb := range symbols {
+		fmt.Println(symb)
 		// Add a measure bar when necessary.
 		if eighth_beats%8 == 0 {
 			tablature.DrawMeasureBar()
@@ -240,13 +242,13 @@ func DrawTablature(w io.Writer, symbols []Symbol) error {
 				return err
 			}
 		default:
-			tablature.canvas.Circle(TAB_LEFT+TAB_WIDTH/2, tablature.current_y, NOTE_RADIUS, "")
-			tablature.current_y -= symb.Length() * SYMBOL_HEIGHT
+			tablature.canvas.Circle(TAB_LEFT+TAB_WIDTH/2, tablature.current_y, NOTE_RADIUS, "fill:green")
+			tablature.current_y -= int(symb.Length()) * SYMBOL_HEIGHT
 		}
 
-		eighth_beats += symb.Length()
+		eighth_beats += int(symb.Length())
 		if symb.Dotted() {
-			eighth_beats += symb.Length() / 2
+			eighth_beats += int(symb.Length()) / 2
 		}
 
 		if eighth_beats > 8 {
