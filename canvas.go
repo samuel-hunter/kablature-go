@@ -28,7 +28,7 @@ const (
 	SYMBOL_HEIGHT = TABNOTE_WIDTH // Spacing a general musical symbol would have allocated.
 
 	BEATS_PER_MEASURE = 8
-	MEASURES_PER_TAB  = 8
+	MEASURES_PER_TAB  = 7
 
 	// Calculated constants
 	MAX_TAB_HEIGHT = (9*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
@@ -53,6 +53,9 @@ type TabScore struct {
 	measure_beats     int
 	current_y         int
 	measure           int
+
+	has_lonely_eighth bool // Whether the last note was an eighth note
+	eighth_pos        int  // Position of previous eighth note
 }
 
 func NewScore(w io.Writer, total_measures int) *TabScore {
@@ -180,6 +183,12 @@ func (score *TabScore) AddMeasure() {
 }
 
 func (score *TabScore) MoveForward(sym Symbol) error {
+
+	// Draw lonely taper when necessary
+	if score.has_lonely_eighth && score.current_y != score.eighth_pos {
+		score.DrawLonelyTaper()
+	}
+
 	length := findTrueLength(sym)
 	score.current_y -= length * SYMBOL_HEIGHT
 
@@ -189,6 +198,9 @@ func (score *TabScore) MoveForward(sym Symbol) error {
 			"Expected %d beats in measure, received %d",
 			BEATS_PER_MEASURE, score.measure_beats))
 	} else if score.measure_beats == 8 {
+		if score.has_lonely_eighth {
+			score.DrawLonelyTaper()
+		}
 		score.AddMeasure()
 		score.measure_beats = 0
 	}
@@ -234,17 +246,29 @@ func (tab *TabScore) DrawPitch(note Note) (int, error) {
 	return note_x, nil
 }
 
+func (score *TabScore) DrawLonelyTaper() {
+	score.has_lonely_eighth = false
+	score.canvas.Line(-20, score.eighth_pos-NOTE_RADIUS,
+		-15, score.eighth_pos-NOTE_RADIUS-5, THIN_STYLE)
+}
+
 // Draw a note's stem and taper if appropriate.
-func (tab *TabScore) DrawStem(note_x int, length byte) {
+func (score *TabScore) DrawStem(note_x int, length byte) {
 	with_stem := length != WHOLE_NOTE
 	tapered := length == EIGHTH_NOTE
 
 	if with_stem {
-		line_y := tab.current_y - NOTE_RADIUS
-		tab.canvas.Line(-20, line_y, note_x, line_y, THIN_STYLE)
+		line_y := score.current_y - NOTE_RADIUS
+		score.canvas.Line(-20, line_y, note_x, line_y, THIN_STYLE)
 
 		if tapered {
-			tab.canvas.Line(-20, line_y, -15, line_y-5, THIN_STYLE)
+			if score.has_lonely_eighth {
+				score.canvas.Line(-20, line_y, -20, score.eighth_pos-NOTE_RADIUS, THIN_STYLE)
+				score.has_lonely_eighth = false
+			} else {
+				score.has_lonely_eighth = true
+				score.eighth_pos = score.current_y
+			}
 		}
 	}
 }
