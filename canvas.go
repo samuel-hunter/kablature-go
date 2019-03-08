@@ -34,6 +34,7 @@ const (
 	MAX_TAB_HEIGHT = (9*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
 	NUM_NOTES      = len(TAB_NOTES)
 	HALF_NOTES     = NUM_NOTES / 2
+	TAB_CENTER     = HALF_NOTES*TABNOTE_WIDTH + MEASURE_THICKNESS/2
 )
 
 var (
@@ -135,9 +136,8 @@ func (score *TabScore) NewTablature() {
 	}
 
 	// Draw central line
-	center_x := HALF_NOTES*TABNOTE_WIDTH + MEASURE_THICKNESS/2
 	line_height := tab_height + HALF_NOTES*TABNOTE_OFFSET_Y
-	score.canvas.Line(center_x, 0, center_x, line_height, MEASURE_STYLE)
+	score.canvas.Line(TAB_CENTER, 0, TAB_CENTER, line_height, MEASURE_STYLE)
 
 	score.current_y = tab_height
 	score.tab_started = true
@@ -284,6 +284,45 @@ func (score *TabScore) AddChord(chord Chord) error {
 	return nil
 }
 
+func (score *TabScore) AddRest(rest Rest) {
+	y := score.current_y
+
+	switch rest.Length() {
+	case WHOLE_NOTE:
+		score.canvas.Rect(TAB_CENTER, y-NOTE_RADIUS/2,
+			NOTE_RADIUS/2, NOTE_RADIUS, "fill:black")
+	case HALF_NOTE:
+		score.canvas.Rect(TAB_CENTER-NOTE_RADIUS/2, y-NOTE_RADIUS/2,
+			NOTE_RADIUS/2, NOTE_RADIUS, "fill:black")
+	case QUARTER_NOTE:
+		score.canvas.Polyline(
+			[]int{
+				TAB_CENTER,
+				TAB_CENTER + TABNOTE_WIDTH/2,
+				TAB_CENTER + TABNOTE_WIDTH,
+				TAB_CENTER + TABNOTE_WIDTH*4/3,
+				TAB_CENTER + TABNOTE_WIDTH*5/3,
+				TAB_CENTER + 2*TABNOTE_WIDTH,
+			}, []int{
+				y,
+				y - TABNOTE_WIDTH/2,
+				y,
+				y - TABNOTE_WIDTH/2,
+				y,
+				y - TABNOTE_WIDTH/4,
+			}, "stroke-width:2;stroke:black;fill:none")
+	case EIGHTH_NOTE:
+		score.canvas.Line(TAB_CENTER+3*TABNOTE_WIDTH/2, y-NOTE_RADIUS,
+			TAB_CENTER+5*TABNOTE_WIDTH/2, y+NOTE_RADIUS,
+			"stroke-width:2;stroke:black;fill:none")
+		score.canvas.Circle(TAB_CENTER+7*TABNOTE_WIDTH/4, y+NOTE_RADIUS/2,
+			NOTE_RADIUS*.75, "fill:black")
+	}
+
+	// score.canvas.Circle(TAB_CENTER, score.current_y, NOTE_RADIUS, "fill:green")
+	score.MoveForward(rest)
+}
+
 func DrawScore(w io.Writer, symbols []Symbol) error {
 	score := NewScore(w, findMeasures(symbols))
 	defer score.Close()
@@ -300,9 +339,10 @@ func DrawScore(w io.Writer, symbols []Symbol) error {
 			if err != nil {
 				return err
 			}
+		case Rest:
+			score.AddRest(symb.(Rest))
 		default:
-			score.canvas.Circle(TAB_WIDTH/2, score.current_y, NOTE_RADIUS, "fill:green")
-			score.MoveForward(symb)
+			return errors.New(fmt.Sprintf("Unrecognized symbol %s.", symb))
 		}
 	}
 
