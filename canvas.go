@@ -43,10 +43,10 @@ var (
 	TEXT_STYLE    = "font-size:" + strconv.Itoa(FONT_SIZE) + ";fill:black"
 )
 
-type TabScore struct {
+type tabScore struct {
 	canvas         *svg.SVG
 	cur_tab        int
-	total_measures int
+	total_measures int // total measures the score will account for
 
 	tab_measures_left int
 	tab_started       bool
@@ -58,33 +58,38 @@ type TabScore struct {
 	eighth_pos        int  // Position of previous eighth note
 }
 
-func NewScore(w io.Writer, total_measures int) *TabScore {
-	tablatures := int(math.Ceil(float64(total_measures) / MEASURES_PER_TAB))
+// Return the total tablatures the tab score should have.
+func (score *tabScore) totalTabs() int {
+	return int(math.Ceil(float64(score.total_measures) / MEASURES_PER_TAB))
+}
 
-	width := tablatures*TAB_WIDTH + (tablatures+1)*TAB_MARGIN_X
+func newScore(w io.Writer, total_measures int) *tabScore {
+	canvas := svg.New(w)
+	score := &tabScore{canvas: canvas, total_measures: total_measures}
+
+	width := score.totalTabs()*TAB_WIDTH + (score.totalTabs()+1)*TAB_MARGIN_X
 	height := MAX_TAB_HEIGHT + TAB_MARGIN_Y*2 + HALF_NOTES*TABNOTE_OFFSET_Y + FONT_SIZE
 
-	canvas := svg.New(w)
 	canvas.Start(width, height)
 
 	// Fill canvas with white background
 	canvas.Rect(0, 0, width, height, "fill:white")
 
-	score := &TabScore{canvas: canvas, total_measures: total_measures}
-	score.AddMeasure()
+	// Add the first measure.
+	score.addMeasure()
 
 	return score
 }
 
-func (tab *TabScore) Close() {
-	if tab.tab_started {
-		tab.canvas.Gend()
+func (score *tabScore) close() {
+	if score.tab_started {
+		score.canvas.Gend()
 	}
 
-	tab.canvas.End()
+	score.canvas.End()
 }
 
-func (score *TabScore) drawTabNote(tab_height, note, offset_y int, marked bool) {
+func (score *tabScore) drawTabNote(tab_height, note, offset_y int, marked bool) {
 	canvas := score.canvas
 	x := note * TABNOTE_WIDTH
 	rect_height := tab_height + offset_y*TABNOTE_OFFSET_Y
@@ -102,7 +107,7 @@ func (score *TabScore) drawTabNote(tab_height, note, offset_y int, marked bool) 
 		string(TAB_NOTES[note]), text_style)
 }
 
-func (score *TabScore) NewTablature() {
+func (score *tabScore) newTablature() {
 	if score.tab_started {
 		score.canvas.Gend()
 	}
@@ -110,8 +115,9 @@ func (score *TabScore) NewTablature() {
 	last_measure := false
 
 	score.tab_measures_left = score.total_measures - MEASURES_PER_TAB*score.cur_tab
-	if score.tab_measures_left >= MEASURES_PER_TAB {
+	if score.tab_measures_left > MEASURES_PER_TAB {
 		score.tab_measures_left = MEASURES_PER_TAB
+	} else {
 		last_measure = true
 	}
 
@@ -146,27 +152,21 @@ func (score *TabScore) NewTablature() {
 	score.tab_started = true
 }
 
-func findTrueLength(symb Symbol) int {
-	if symb.Dotted() {
-		return int(float64(symb.Length()) * 1.5)
-	} else {
-		return int(symb.Length())
-	}
-}
-
-func findMeasures(symbols []Symbol) int {
+// Count the measures needed to fit in all musical symbols in the
+// given slice.
+func countMeasures(symbols []Symbol) int {
 	eighth_beats := 0
 
 	for _, symb := range symbols {
-		eighth_beats += findTrueLength(symb)
+		eighth_beats += SymbolLength(symb)
 	}
 
 	return int(math.Ceil(float64(eighth_beats) / 8))
 }
 
-func (score *TabScore) AddMeasure() {
-	if score.tab_measures_left == 0 {
-		score.NewTablature()
+func (score *tabScore) addMeasure() {
+	if score.tab_measures_left == 0 && score.measure < score.total_measures {
+		score.newTablature()
 	}
 
 	bar_y := score.current_y - MEASURE_THICKNESS/2
@@ -182,14 +182,14 @@ func (score *TabScore) AddMeasure() {
 	score.current_y -= SYMBOL_HEIGHT
 }
 
-func (score *TabScore) MoveForward(sym Symbol) error {
+func (score *tabScore) moveForward(sym Symbol) error {
 
 	// Draw lonely taper when necessary
 	if score.has_lonely_eighth && score.current_y != score.eighth_pos {
-		score.DrawLonelyTaper()
+		score.drawLonelyTaper()
 	}
 
-	length := findTrueLength(sym)
+	length := SymbolLength(sym)
 	score.current_y -= length * SYMBOL_HEIGHT
 
 	score.measure_beats += length
@@ -199,9 +199,9 @@ func (score *TabScore) MoveForward(sym Symbol) error {
 			BEATS_PER_MEASURE, score.measure_beats))
 	} else if score.measure_beats == 8 {
 		if score.has_lonely_eighth {
-			score.DrawLonelyTaper()
+			score.drawLonelyTaper()
 		}
-		score.AddMeasure()
+		score.addMeasure()
 		score.measure_beats = 0
 	}
 
@@ -220,7 +220,7 @@ func findNotePosition(pitch byte) (int, error) {
 }
 
 // Draw a note without any stem or taper and return its x position.
-func (tab *TabScore) DrawPitch(note Note) (int, error) {
+func (tab *tabScore) drawPitch(note Note) (int, error) {
 	note_x, err := findNotePosition(note.pitch)
 
 	if err != nil {
@@ -246,14 +246,14 @@ func (tab *TabScore) DrawPitch(note Note) (int, error) {
 	return note_x, nil
 }
 
-func (score *TabScore) DrawLonelyTaper() {
+func (score *tabScore) drawLonelyTaper() {
 	score.has_lonely_eighth = false
 	score.canvas.Line(-20, score.eighth_pos-NOTE_RADIUS,
 		-15, score.eighth_pos-NOTE_RADIUS-5, THIN_STYLE)
 }
 
 // Draw a note's stem and taper if appropriate.
-func (score *TabScore) DrawStem(note_x int, length byte) {
+func (score *tabScore) drawStem(note_x int, length byte) {
 	with_stem := length != WHOLE_NOTE
 	tapered := length == EIGHTH_NOTE
 
@@ -274,22 +274,22 @@ func (score *TabScore) DrawStem(note_x int, length byte) {
 }
 
 // Draw a note with a stem and taper when appropriate.
-func (score *TabScore) AddNote(note Note) error {
-	note_x, err := score.DrawPitch(note)
+func (score *tabScore) addNote(note Note) error {
+	note_x, err := score.drawPitch(note)
 	if err != nil {
 		return err
 	}
 
-	score.DrawStem(note_x, note.length)
-	score.MoveForward(note)
+	score.drawStem(note_x, note.length)
+	score.moveForward(note)
 	return nil
 }
 
-func (score *TabScore) AddChord(chord Chord) error {
+func (score *tabScore) addChord(chord Chord) error {
 	rightmost_x := 0
 
 	for _, pitch := range chord.pitches {
-		note_x, err := score.DrawPitch(Note{
+		note_x, err := score.drawPitch(Note{
 			length: chord.length,
 			dotted: chord.dotted,
 			pitch:  pitch,
@@ -303,15 +303,15 @@ func (score *TabScore) AddChord(chord Chord) error {
 		}
 	}
 
-	score.DrawStem(rightmost_x, chord.length)
-	score.MoveForward(chord)
+	score.drawStem(rightmost_x, chord.length)
+	score.moveForward(chord)
 	return nil
 }
 
-func (score *TabScore) AddRest(rest Rest) {
+func (score *tabScore) addRest(rest Rest) {
 	y := score.current_y
 
-	switch rest.Length() {
+	switch rest.length {
 	case WHOLE_NOTE:
 		score.canvas.Rect(TAB_CENTER, y-NOTE_RADIUS/2,
 			NOTE_RADIUS/2, NOTE_RADIUS, "fill:black")
@@ -343,28 +343,27 @@ func (score *TabScore) AddRest(rest Rest) {
 			NOTE_RADIUS*.75, "fill:black")
 	}
 
-	// score.canvas.Circle(TAB_CENTER, score.current_y, NOTE_RADIUS, "fill:green")
-	score.MoveForward(rest)
+	score.moveForward(rest)
 }
 
 func DrawScore(w io.Writer, symbols []Symbol) error {
-	score := NewScore(w, findMeasures(symbols))
-	defer score.Close()
+	score := newScore(w, countMeasures(symbols))
+	defer score.close()
 
 	for _, symb := range symbols {
 		switch symb.(type) {
 		case Note:
-			err := score.AddNote(symb.(Note))
+			err := score.addNote(symb.(Note))
 			if err != nil {
 				return err
 			}
 		case Chord:
-			err := score.AddChord(symb.(Chord))
+			err := score.addChord(symb.(Chord))
 			if err != nil {
 				return err
 			}
 		case Rest:
-			score.AddRest(symb.(Rest))
+			score.addRest(symb.(Rest))
 		default:
 			return errors.New(fmt.Sprintf("Unrecognized symbol %s.", symb))
 		}

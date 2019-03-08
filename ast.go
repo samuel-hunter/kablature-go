@@ -20,8 +20,8 @@ var NOTE_LENGTHS = []byte{
 }
 
 type Symbol interface {
-	Length() byte // Number of eighth beats a note holds
-	Dotted() bool // Whether the length is dotted (i.e. x1.5)
+	BaseLength() byte // Number of eighth beats a note holds
+	Dotted() bool     // Whether the length is dotted (i.e. x1.5)
 	Equal(Symbol) bool
 }
 
@@ -42,8 +42,8 @@ type Rest struct {
 	dotted bool
 }
 
-func (n Note) Length() byte { return n.length }
-func (n Note) Dotted() bool { return n.dotted }
+func (n Note) BaseLength() byte { return n.length }
+func (n Note) Dotted() bool     { return n.dotted }
 func (n Note) String() string {
 	return fmt.Sprintf("<NOTE %d %t %d>", n.length, n.dotted, n.pitch)
 }
@@ -56,8 +56,8 @@ func (n Note) Equal(s Symbol) bool {
 		n.pitch == that.pitch
 }
 
-func (c Chord) Length() byte { return c.length }
-func (c Chord) Dotted() bool { return c.dotted }
+func (c Chord) BaseLength() byte { return c.length }
+func (c Chord) Dotted() bool     { return c.dotted }
 func (c Chord) String() string {
 	return fmt.Sprintf("<CHORD %d %t %s>", c.length, c.dotted, c.pitches)
 }
@@ -70,8 +70,8 @@ func (c Chord) Equal(s Symbol) bool {
 		c.dotted == that.dotted
 }
 
-func (r Rest) Length() byte { return r.length }
-func (r Rest) Dotted() bool { return r.dotted }
+func (r Rest) BaseLength() byte { return r.length }
+func (r Rest) Dotted() bool     { return r.dotted }
 func (r Rest) String() string {
 	return fmt.Sprintf("<REST %d %t>", r.length, r.dotted)
 }
@@ -81,4 +81,13 @@ func (r Rest) Equal(s Symbol) bool {
 	return ok &&
 		r.length == that.length &&
 		r.dotted == that.dotted
+}
+
+// Return the length of a note, dot accounted for.
+func SymbolLength(sym Symbol) int {
+	if sym.Dotted() {
+		return int(float64(sym.BaseLength()) * 1.5)
+	} else {
+		return int(sym.BaseLength())
+	}
 }
