@@ -75,15 +75,21 @@ func newScore(w io.Writer, total_measures int) *tabScore {
 	// Fill canvas with white background
 	canvas.Rect(0, 0, width, height, "fill:white")
 
-	// Add the first measure.
-	score.addMeasure()
-
 	return score
 }
 
+// Add the ending notes to the tablature if started, and wrap
+// everything up.
 func (score *tabScore) close() {
 	if score.tab_started {
+		// Add ending lines to last measure.
+		end_y := MEASURE_THICKNESS / 2
+		score.canvas.Line(0, end_y, TAB_WIDTH, end_y, MEASURE_STYLE)
+		end_y += SYMBOL_HEIGHT / 2
+		score.canvas.Line(0, end_y, TAB_WIDTH, end_y, THIN_STYLE)
+
 		score.canvas.Gend()
+		score.tab_started = false
 	}
 
 	score.canvas.End()
@@ -165,10 +171,6 @@ func countMeasures(symbols []Symbol) int {
 }
 
 func (score *tabScore) addMeasure() {
-	if score.tab_measures_left == 0 && score.measure < score.total_measures {
-		score.newTablature()
-	}
-
 	bar_y := score.current_y - MEASURE_THICKNESS/2
 	text_style := TEXT_STYLE + ";dominant-baseline:central"
 	text_margin_left := 2
@@ -182,12 +184,9 @@ func (score *tabScore) addMeasure() {
 	score.current_y -= SYMBOL_HEIGHT
 }
 
+// Add spacing to separate the previously drawn musical symbol with
+// any future symbols.
 func (score *tabScore) moveForward(sym Symbol) error {
-
-	// Draw lonely taper when necessary
-	if score.has_lonely_eighth && score.current_y != score.eighth_pos {
-		score.drawLonelyTaper()
-	}
 
 	length := SymbolLength(sym)
 	score.current_y -= length * SYMBOL_HEIGHT
@@ -197,12 +196,6 @@ func (score *tabScore) moveForward(sym Symbol) error {
 		return errors.New(fmt.Sprintf(
 			"Expected %d beats in measure, received %d",
 			BEATS_PER_MEASURE, score.measure_beats))
-	} else if score.measure_beats == 8 {
-		if score.has_lonely_eighth {
-			score.drawLonelyTaper()
-		}
-		score.addMeasure()
-		score.measure_beats = 0
 	}
 
 	return nil
@@ -281,7 +274,6 @@ func (score *tabScore) addNote(note Note) error {
 	}
 
 	score.drawStem(note_x, note.length)
-	score.moveForward(note)
 	return nil
 }
 
@@ -304,7 +296,6 @@ func (score *tabScore) addChord(chord Chord) error {
 	}
 
 	score.drawStem(rightmost_x, chord.length)
-	score.moveForward(chord)
 	return nil
 }
 
@@ -343,37 +334,54 @@ func (score *tabScore) addRest(rest Rest) {
 			NOTE_RADIUS*.75, "fill:black")
 	}
 
-	score.moveForward(rest)
+}
+
+func (score *tabScore) addSymbol(sym Symbol) (err error) {
+
+	if score.measure_beats%8 == 0 {
+		if score.has_lonely_eighth {
+			score.drawLonelyTaper()
+		}
+
+		if score.tab_measures_left == 0 {
+			score.newTablature()
+		}
+
+		score.addMeasure()
+		score.measure_beats = 0
+	}
+
+	switch sym.(type) {
+	case Note:
+		err = score.addNote(sym.(Note))
+	case Chord:
+		err = score.addChord(sym.(Chord))
+	case Rest:
+		score.addRest(sym.(Rest))
+	default:
+		err = errors.New(fmt.Sprintf("Unrecognized symbol %s.", sym))
+	}
+
+	// Draw lonely taper when necessary
+	if score.has_lonely_eighth && score.eighth_pos != score.current_y {
+		score.drawLonelyTaper()
+	}
+
+	score.moveForward(sym)
+
+	return err
 }
 
 func DrawScore(w io.Writer, symbols []Symbol) error {
 	score := newScore(w, countMeasures(symbols))
 	defer score.close()
 
-	for _, symb := range symbols {
-		switch symb.(type) {
-		case Note:
-			err := score.addNote(symb.(Note))
-			if err != nil {
-				return err
-			}
-		case Chord:
-			err := score.addChord(symb.(Chord))
-			if err != nil {
-				return err
-			}
-		case Rest:
-			score.addRest(symb.(Rest))
-		default:
-			return errors.New(fmt.Sprintf("Unrecognized symbol %s.", symb))
+	for _, sym := range symbols {
+		err := score.addSymbol(sym)
+		if err != nil {
+			return err
 		}
 	}
-
-	// Add ending lines
-	end_y := MEASURE_THICKNESS / 2
-	score.canvas.Line(0, end_y, TAB_WIDTH, end_y, MEASURE_STYLE)
-	end_y += SYMBOL_HEIGHT / 2
-	score.canvas.Line(0, end_y, TAB_WIDTH, end_y, THIN_STYLE)
 
 	return nil
 }
