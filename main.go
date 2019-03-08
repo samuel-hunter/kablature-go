@@ -1,14 +1,22 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"io"
-	"log"
-	"net/http"
 	"os"
 )
 
-func InterpretTablature(w io.Writer, r io.Reader) error {
-	parser := NewParser(r)
+var inputFile string
+var outputFile string
+
+func InterpretFile(w io.Writer) error {
+	file, err := os.Open(inputFile)
+	if err != nil {
+		return err
+	}
+
+	parser := NewParser(file)
 	var symbols []Symbol
 
 	for {
@@ -25,23 +33,23 @@ func InterpretTablature(w io.Writer, r io.Reader) error {
 	return DrawScore(w, symbols)
 }
 
-func writeToServer(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "image/svg+xml")
-	file, err := os.Open("song1.tab")
-	if err != nil {
-		panic(err)
-	}
-
-	err = InterpretTablature(w, file)
-	if err != nil {
-		panic(err)
-	}
+func init() {
+	flag.StringVar(&inputFile, "i", "", "Input file")
+	flag.StringVar(&outputFile, "o", "out.svg", "Output file")
 }
 
 func main() {
-	http.Handle("/", http.HandlerFunc(writeToServer))
-	err := http.ListenAndServe(":8000", nil)
-	if err != nil {
-		log.Fatal("ListenAndServe:", err)
+	flag.Parse()
+
+	if inputFile == "" {
+		fmt.Fprintln(os.Stderr, "Input file is not specified.")
+		os.Exit(1)
 	}
+
+	out, err := os.Create(outputFile)
+	if err != nil {
+		panic(err)
+	}
+
+	InterpretFile(out)
 }

@@ -19,7 +19,7 @@ const (
 	TABNOTE_OFFSET_Y = 5
 	TABNOTE_WIDTH    = 15
 	TABNOTE_COLOR    = "white"
-	TABNOTE_MARKED   = "#ee7c80"
+	TABNOTE_MARKED   = "salmon"
 
 	MEASURE_THICKNESS = 3
 	FONT_SIZE         = 10
@@ -336,6 +336,8 @@ func (score *tabScore) addRest(rest Rest) {
 
 }
 
+// Add a symbol to the tablature score, adding measures and tablatures
+// when necessary.
 func (score *tabScore) addSymbol(sym Symbol) (err error) {
 
 	if score.measure_beats%8 == 0 {
