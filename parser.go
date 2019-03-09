@@ -53,6 +53,19 @@ func (p *Parser) next() (rune, error) {
 	}
 }
 
+// Skip the rest of the line.
+func (p *Parser) skipLine() error {
+	for {
+		r, _, err := p.reader.ReadRune()
+		if err != nil {
+			return err
+		}
+		if r == '\n' {
+			return nil
+		}
+	}
+}
+
 func (p *Parser) unread() {
 	p.reader.UnreadRune()
 }
@@ -174,6 +187,12 @@ func (parser *Parser) Next() (Symbol, error) {
 			}
 		} else {
 			switch r {
+			case '#':
+				// Skip the rest of the line.
+				err = parser.skipLine()
+				if err != nil {
+					return nil, err
+				}
 			case TOK_CHORD_START:
 				return parser.scanChord()
 			case TOK_OCTAVE_UPSHIFT:

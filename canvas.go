@@ -27,11 +27,11 @@ const (
 	NOTE_RADIUS   = 4
 	SYMBOL_HEIGHT = TABNOTE_WIDTH // Spacing a general musical symbol would have allocated.
 
-	BEATS_PER_MEASURE = 8
-	MEASURES_PER_TAB  = 7
+	BEATS_PER_MEASURE = 6
+	MEASURES_PER_TAB  = 12
 
 	// Calculated constants
-	MAX_TAB_HEIGHT = (9*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
+	MAX_TAB_HEIGHT = ((BEATS_PER_MEASURE+1)*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
 	NUM_NOTES      = len(TAB_NOTES)
 	HALF_NOTES     = NUM_NOTES / 2
 	TAB_CENTER     = HALF_NOTES*TABNOTE_WIDTH + MEASURE_THICKNESS/2
@@ -129,7 +129,7 @@ func (score *tabScore) newTablature() {
 
 	score.cur_tab++
 
-	tab_height := score.tab_measures_left * 9 * SYMBOL_HEIGHT
+	tab_height := score.tab_measures_left * (BEATS_PER_MEASURE + 1) * SYMBOL_HEIGHT
 	if last_measure {
 		tab_height += SYMBOL_HEIGHT
 	}
@@ -167,7 +167,7 @@ func countMeasures(symbols []Symbol) int {
 		eighth_beats += SymbolLength(symb)
 	}
 
-	return int(math.Ceil(float64(eighth_beats) / 8))
+	return int(math.Ceil(float64(eighth_beats) / BEATS_PER_MEASURE))
 }
 
 func (score *tabScore) addMeasure() {
@@ -182,23 +182,6 @@ func (score *tabScore) addMeasure() {
 
 	score.tab_measures_left--
 	score.current_y -= SYMBOL_HEIGHT
-}
-
-// Add spacing to separate the previously drawn musical symbol with
-// any future symbols.
-func (score *tabScore) moveForward(sym Symbol) error {
-
-	length := SymbolLength(sym)
-	score.current_y -= length * SYMBOL_HEIGHT
-
-	score.measure_beats += length
-	if score.measure_beats > 8 {
-		return errors.New(fmt.Sprintf(
-			"Expected %d beats in measure, received %d",
-			BEATS_PER_MEASURE, score.measure_beats))
-	}
-
-	return nil
 }
 
 // Return the x position that the provided pitch would be on.
@@ -340,7 +323,7 @@ func (score *tabScore) addRest(rest Rest) {
 // when necessary.
 func (score *tabScore) addSymbol(sym Symbol) (err error) {
 
-	if score.measure_beats%8 == 0 {
+	if score.measure_beats%BEATS_PER_MEASURE == 0 {
 		if score.has_lonely_eighth {
 			score.drawLonelyTaper()
 		}
@@ -369,7 +352,17 @@ func (score *tabScore) addSymbol(sym Symbol) (err error) {
 		score.drawLonelyTaper()
 	}
 
-	score.moveForward(sym)
+	// Add spacing to separate the previously drawn musical symbol with
+	// any future symbols.
+	length := SymbolLength(sym)
+	score.current_y -= length * SYMBOL_HEIGHT
+
+	score.measure_beats += length
+	if score.measure_beats > BEATS_PER_MEASURE {
+		return errors.New(fmt.Sprintf(
+			"Expected %d beats in measure, received %d",
+			BEATS_PER_MEASURE, score.measure_beats))
+	}
 
 	return err
 }
