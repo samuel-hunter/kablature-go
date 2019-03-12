@@ -27,8 +27,8 @@ const (
 	NOTE_RADIUS   = 4
 	SYMBOL_HEIGHT = TABNOTE_WIDTH // Spacing a general musical symbol would have allocated.
 
-	BEATS_PER_MEASURE = 6
-	MEASURES_PER_TAB  = 12
+	BEATS_PER_MEASURE = 8
+	MEASURES_PER_TAB  = 7
 
 	// Calculated constants
 	MAX_TAB_HEIGHT = ((BEATS_PER_MEASURE+1)*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
