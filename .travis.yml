@@ -1,0 +1,12 @@
+language: go
+sudo: false
+
+go:
+- 1.11.x
+- master
+
+install:
+- go get github.com/ajstarks/svgo
+
+script:
+- go test -v -race ./.
