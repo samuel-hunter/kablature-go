@@ -7,16 +7,18 @@ import (
 	"os"
 )
 
-var inputFile string
-var outputFile string
+type Config struct {
+	inputFile  string
+	outputFile string
 
-func InterpretFile(w io.Writer) error {
-	file, err := os.Open(inputFile)
-	if err != nil {
-		return err
-	}
+	BeatsPerMeasure int
+	MeasuresPerTab  int
+}
 
-	parser := NewParser(file)
+var GlobalConfig Config
+
+func InterpretFile(w io.Writer, r io.Reader) error {
+	parser := NewParser(r)
 	var symbols []Symbol
 
 	for {
@@ -34,22 +36,29 @@ func InterpretFile(w io.Writer) error {
 }
 
 func init() {
-	flag.StringVar(&inputFile, "i", "", "Input file")
-	flag.StringVar(&outputFile, "o", "out.svg", "Output file")
+	flag.StringVar(&GlobalConfig.inputFile, "i", "", "Input file")
+	flag.StringVar(&GlobalConfig.outputFile, "o", "out.svg", "Output file")
+	flag.IntVar(&GlobalConfig.BeatsPerMeasure, "b", 8, "Beats per measure")
+	flag.IntVar(&GlobalConfig.MeasuresPerTab, "m", 7, "Measures per tab")
 }
 
 func main() {
 	flag.Parse()
 
-	if inputFile == "" {
+	if GlobalConfig.inputFile == "" {
 		fmt.Fprintln(os.Stderr, "Input file is not specified.")
 		os.Exit(1)
 	}
 
-	out, err := os.Create(outputFile)
+	in, err := os.Open(GlobalConfig.inputFile)
 	if err != nil {
 		panic(err)
 	}
 
-	InterpretFile(out)
+	out, err := os.Create(GlobalConfig.outputFile)
+	if err != nil {
+		panic(err)
+	}
+
+	InterpretFile(out, in)
 }

@@ -27,14 +27,10 @@ const (
 	NOTE_RADIUS   = 4
 	SYMBOL_HEIGHT = TABNOTE_WIDTH // Spacing a general musical symbol would have allocated.
 
-	BEATS_PER_MEASURE = 8
-	MEASURES_PER_TAB  = 7
-
 	// Calculated constants
-	MAX_TAB_HEIGHT = ((BEATS_PER_MEASURE+1)*MEASURES_PER_TAB + 1) * SYMBOL_HEIGHT
-	NUM_NOTES      = len(TAB_NOTES)
-	HALF_NOTES     = NUM_NOTES / 2
-	TAB_CENTER     = HALF_NOTES*TABNOTE_WIDTH + MEASURE_THICKNESS/2
+	NUM_NOTES  = len(TAB_NOTES)
+	HALF_NOTES = NUM_NOTES / 2
+	TAB_CENTER = HALF_NOTES*TABNOTE_WIDTH + MEASURE_THICKNESS/2
 )
 
 var (
@@ -60,7 +56,22 @@ type tabScore struct {
 
 // Return the total tablatures the tab score should have.
 func (score *tabScore) totalTabs() int {
-	return int(math.Ceil(float64(score.total_measures) / MEASURES_PER_TAB))
+	return int(math.Ceil(float64(score.total_measures) / float64(GlobalConfig.MeasuresPerTab)))
+}
+
+// Return the calculated height of a tablature.
+func tabHeight(measures int, withEndSymbol bool) int {
+	result := ((GlobalConfig.BeatsPerMeasure + 1) * measures) * SYMBOL_HEIGHT
+	if withEndSymbol {
+		result += SYMBOL_HEIGHT
+	}
+
+	return result
+}
+
+// Return the highest possible measure of a tablature.
+func maxTabHeight() int {
+	return tabHeight(GlobalConfig.MeasuresPerTab, true)
 }
 
 func newScore(w io.Writer, total_measures int) *tabScore {
@@ -68,7 +79,7 @@ func newScore(w io.Writer, total_measures int) *tabScore {
 	score := &tabScore{canvas: canvas, total_measures: total_measures}
 
 	width := score.totalTabs()*TAB_WIDTH + (score.totalTabs()+1)*TAB_MARGIN_X
-	height := MAX_TAB_HEIGHT + TAB_MARGIN_Y*2 + HALF_NOTES*TABNOTE_OFFSET_Y + FONT_SIZE
+	height := maxTabHeight() + TAB_MARGIN_Y*2 + HALF_NOTES*TABNOTE_OFFSET_Y + FONT_SIZE
 
 	canvas.Start(width, height)
 
@@ -120,22 +131,18 @@ func (score *tabScore) newTablature() {
 
 	last_measure := false
 
-	score.tab_measures_left = score.total_measures - MEASURES_PER_TAB*score.cur_tab
-	if score.tab_measures_left > MEASURES_PER_TAB {
-		score.tab_measures_left = MEASURES_PER_TAB
+	score.tab_measures_left = score.total_measures - GlobalConfig.MeasuresPerTab*score.cur_tab
+	if score.tab_measures_left > GlobalConfig.MeasuresPerTab {
+		score.tab_measures_left = GlobalConfig.MeasuresPerTab
 	} else {
 		last_measure = true
 	}
 
 	score.cur_tab++
 
-	tab_height := score.tab_measures_left * (BEATS_PER_MEASURE + 1) * SYMBOL_HEIGHT
-	if last_measure {
-		tab_height += SYMBOL_HEIGHT
-	}
-
+	tab_height := tabHeight(score.tab_measures_left, last_measure)
 	offset_x := score.cur_tab*TAB_MARGIN_X + (score.cur_tab-1)*TAB_WIDTH
-	offset_y := TAB_MARGIN_Y + MAX_TAB_HEIGHT - tab_height
+	offset_y := TAB_MARGIN_Y + maxTabHeight() - tab_height
 
 	score.canvas.Translate(offset_x, offset_y)
 
@@ -167,7 +174,8 @@ func countMeasures(symbols []Symbol) int {
 		eighth_beats += SymbolLength(symb)
 	}
 
-	return int(math.Ceil(float64(eighth_beats) / BEATS_PER_MEASURE))
+	result := int(math.Ceil(float64(eighth_beats) / float64(GlobalConfig.BeatsPerMeasure)))
+	return result
 }
 
 func (score *tabScore) addMeasure() {
@@ -323,7 +331,7 @@ func (score *tabScore) addRest(rest Rest) {
 // when necessary.
 func (score *tabScore) addSymbol(sym Symbol) (err error) {
 
-	if score.measure_beats%BEATS_PER_MEASURE == 0 {
+	if score.measure_beats%GlobalConfig.BeatsPerMeasure == 0 {
 		if score.has_lonely_eighth {
 			score.drawLonelyTaper()
 		}
@@ -358,10 +366,10 @@ func (score *tabScore) addSymbol(sym Symbol) (err error) {
 	score.current_y -= length * SYMBOL_HEIGHT
 
 	score.measure_beats += length
-	if score.measure_beats > BEATS_PER_MEASURE {
+	if score.measure_beats > GlobalConfig.BeatsPerMeasure {
 		return errors.New(fmt.Sprintf(
 			"Expected %d beats in measure, received %d",
-			BEATS_PER_MEASURE, score.measure_beats))
+			GlobalConfig.BeatsPerMeasure, score.measure_beats))
 	}
 
 	return err
