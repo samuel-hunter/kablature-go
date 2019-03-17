@@ -1,3 +1,5 @@
+// symbols - definition of music symbol data structures
+
 package main
 
 import "fmt"
@@ -20,23 +22,26 @@ var NOTE_LENGTHS = []byte{
 }
 
 type Symbol interface {
-	BaseLength() byte // Number of eighth beats a note holds
-	Dotted() bool     // Whether the length is dotted (i.e. x1.5)
-	Equal(Symbol) bool
+	BaseLength() byte  // Number of eighth beats a note holds
+	Dotted() bool      // Whether the length is dotted (i.e. x1.5)
+	Equal(Symbol) bool // For unit tests
 }
 
+// One single note.
 type Note struct {
 	length byte
 	dotted bool
 	pitch  byte // 0 = C, 7 = G, 8 = C at a higher octave, etc.
 }
 
+// A series of notes played at once.
 type Chord struct {
 	length  byte
 	dotted  bool
 	pitches []byte
 }
 
+// A single rest.
 type Rest struct {
 	length byte
 	dotted bool

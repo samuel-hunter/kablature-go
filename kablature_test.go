@@ -1,3 +1,4 @@
+// kablature_test - for testing whether everything is consistent.
 package main
 
 import (

@@ -1,3 +1,5 @@
+// canvas - Transcribing the tablature to SVG.
+
 package main
 
 import (
@@ -74,6 +76,7 @@ func maxTabHeight() int {
 	return tabHeight(GlobalConfig.MeasuresPerTab, true)
 }
 
+// Construct a new tablature score.
 func newScore(w io.Writer, total_measures int) *tabScore {
 	canvas := svg.New(w)
 	score := &tabScore{canvas: canvas, total_measures: total_measures}
@@ -106,7 +109,8 @@ func (score *tabScore) close() {
 	score.canvas.End()
 }
 
-func (score *tabScore) drawTabNote(tab_height, note, offset_y int, marked bool) {
+// Draw the space for a note across the entire tablature.
+func (score *tabScore) drawNoteSpace(tab_height, note, offset_y int, marked bool) {
 	canvas := score.canvas
 	x := note * TABNOTE_WIDTH
 	rect_height := tab_height + offset_y*TABNOTE_OFFSET_Y
@@ -150,10 +154,10 @@ func (score *tabScore) newTablature() {
 	for i := 0; i < NUM_NOTES; i++ {
 		if i < HALF_NOTES {
 			// Draw notes going down
-			score.drawTabNote(tab_height, i, i, (i+1)%3 == 0)
+			score.drawNoteSpace(tab_height, i, i, (i+1)%3 == 0)
 		} else {
 			// Draw notes going up
-			score.drawTabNote(tab_height, i, NUM_NOTES-i-1, (i+1)%3 == 0)
+			score.drawNoteSpace(tab_height, i, NUM_NOTES-i-1, (i+1)%3 == 0)
 		}
 	}
 
@@ -178,6 +182,8 @@ func countMeasures(symbols []Symbol) int {
 	return result
 }
 
+// Add a new measure to the tablature score to start adding symbols
+// to.
 func (score *tabScore) addMeasure() {
 	bar_y := score.current_y - MEASURE_THICKNESS/2
 	text_style := TEXT_STYLE + ";dominant-baseline:central"
@@ -230,6 +236,7 @@ func (tab *tabScore) drawPitch(note Note) (int, error) {
 	return note_x, nil
 }
 
+// Draw the taper to a lonely eighth note.
 func (score *tabScore) drawLonelyTaper() {
 	score.has_lonely_eighth = false
 	score.canvas.Line(-20, score.eighth_pos-NOTE_RADIUS,
@@ -257,7 +264,8 @@ func (score *tabScore) drawStem(note_x int, length byte) {
 	}
 }
 
-// Draw a note with a stem and taper when appropriate.
+// Add a note to the current tablature with a stem and taper when
+// appropriate.
 func (score *tabScore) addNote(note Note) error {
 	note_x, err := score.drawPitch(note)
 	if err != nil {
@@ -268,6 +276,7 @@ func (score *tabScore) addNote(note Note) error {
 	return nil
 }
 
+// Add a chord to the current tablature.
 func (score *tabScore) addChord(chord Chord) error {
 	rightmost_x := 0
 
@@ -290,17 +299,22 @@ func (score *tabScore) addChord(chord Chord) error {
 	return nil
 }
 
+// Add a rest to the current tablature.
 func (score *tabScore) addRest(rest Rest) {
 	y := score.current_y
 
 	switch rest.length {
 	case WHOLE_NOTE:
+		// Draw a rectangle from the center right to signify a whole rest.
 		score.canvas.Rect(TAB_CENTER, y-NOTE_RADIUS/2,
 			NOTE_RADIUS/2, NOTE_RADIUS, "fill:black")
 	case HALF_NOTE:
+		// Draw a rectangle from the center left to signify a half rest.
 		score.canvas.Rect(TAB_CENTER-NOTE_RADIUS/2, y-NOTE_RADIUS/2,
 			NOTE_RADIUS/2, NOTE_RADIUS, "fill:black")
 	case QUARTER_NOTE:
+		// Draw a squiggly line from the center to the right to
+		// signify a quarter rest.
 		score.canvas.Polyline(
 			[]int{
 				TAB_CENTER,
@@ -318,6 +332,7 @@ func (score *tabScore) addRest(rest Rest) {
 				y - TABNOTE_WIDTH/4,
 			}, "stroke-width:2;stroke:black;fill:none")
 	case EIGHTH_NOTE:
+		// Draw a diagonal line with a small tick to signify an eighth rest.
 		score.canvas.Line(TAB_CENTER+3*TABNOTE_WIDTH/2, y-NOTE_RADIUS,
 			TAB_CENTER+5*TABNOTE_WIDTH/2, y+NOTE_RADIUS,
 			"stroke-width:2;stroke:black;fill:none")
@@ -375,6 +390,7 @@ func (score *tabScore) addSymbol(sym Symbol) (err error) {
 	return err
 }
 
+// Write a complete tablature score to the writer in SVG format.
 func DrawScore(w io.Writer, symbols []Symbol) error {
 	score := newScore(w, countMeasures(symbols))
 	defer score.close()

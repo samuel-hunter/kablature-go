@@ -1,3 +1,6 @@
+// parser - converting text source file to a more computer-friendly
+// data structure.
+
 package main
 
 import (
