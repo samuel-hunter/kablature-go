@@ -1,4 +1,7 @@
-# Kablature - Convert text files to kalimba tablature images
+# Kablature - Create kalimba tablature SVG Images
+
+[![Build Status](https://travis-ci.org/samuel-hunter/kablature.svg?branch=master)](https://travis-ci.org/samuel-hunter/kablature)
+
 
 The program takes a custom text file format and generates an SVG image
 describing the song.
@@ -30,7 +33,6 @@ $ kablature -i hot-cross-buns.kab -o hot-cross-buns.svg
 ## Language
 
 ```
-$ cat > song.kab <<<EOF
 # Eighth notes
 1 c d e f g h i j
 # Quarter notes
